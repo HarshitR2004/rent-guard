@@ -11,8 +11,7 @@ node_modules/
 !.yarn/versions
 
 # package manager / local installs
-frontend/node_modules/
-backend/node_modules/
+app/node_modules/
 
 # testing
 coverage/
@@ -49,6 +48,7 @@ yarn-error.log*
 .env*
 !.env.example
 !.env.*.example
+.env
 
 # vercel
 .vercel

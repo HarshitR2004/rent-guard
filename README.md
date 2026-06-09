@@ -13,10 +13,11 @@ In the rental housing market, **security deposit disputes are a major friction p
 ## 💡 The Solution
 **RentGuard** is an AI-powered rental escrow registry that protects both parties by creating a cryptographically secure, auditable property lifecycle.
 
-1. **Move-In**: The tenant uploads proof-of-condition photos. The security deposit registration is logged on the **Monad blockchain** under a unique Booking ID.
-2. **Move-Out**: The tenant uploads checkout photos and optionally submits a statement. 
-3. **Gemini Vision** compares the move-in and move-out photos to detect new damages and estimate repair costs.
-4. **On-Chain Settlement**: The final report hash, repair cost, and damage status are committed to the Monad contract, recommending a trustless refund calculation.
+1. **Wallet Connection Gate**: The tenant connects their Web3 wallet (e.g. MetaMask) on Monad Testnet to browse active property listings.
+2. **Move-In**: The tenant uploads proof-of-condition photos. The security deposit registration is signed and logged directly on the **Monad blockchain** under a unique Booking ID.
+3. **Move-Out**: The tenant uploads checkout photos and optionally submits a statement.
+4. **Gemini Vision**: The app compares the move-in and move-out photos client-side directly via the Gemini API to detect new damages and estimate repair costs.
+5. **On-Chain Settlement**: The final report hash, repair cost, and damage status are committed to the Monad contract directly via the tenant's connected wallet, recommending a trustless refund calculation.
 
 ---
 
@@ -26,30 +27,26 @@ In the rental housing market, **security deposit disputes are a major friction p
 sequenceDiagram
     autonumber
     actor Tenant as Tenant / Landlord
-    participant Web as React Frontend
-    participant API as Express API
+    participant App as React App (Client-side)
     participant Monad as Monad Testnet Contract
     participant Gemini as Gemini Vision API
 
     Note over Tenant, Monad: PHASE 1 — MOVE IN
-    Tenant->>Web: Starts Move-In & Uploads Photos
-    Tenant->>Web: Enters Booking ID & Deposit
-    Web->>API: POST /api/move-in
-    API->>Monad: registerDeposit(bookingId, depositAmount)
-    Monad-->>API: Transaction Hash
-    API-->>Web: Success & Tx Hash (Saved in Local Storage)
+    Tenant->>App: Starts Move-In & Uploads Photos
+    Tenant->>App: Enters Booking ID & Deposit
+    App->>Monad: registerDeposit(bookingId, depositAmount) [Signed by User Wallet]
+    Monad-->>App: Transaction Hash
+    App-->>Tenant: Success & Tx Hash (Saved in Local Storage)
 
     Note over Tenant, Gemini: PHASE 2 — MOVE OUT
-    Tenant->>Web: Starts Move-Out & Uploads Current Photos
-    Tenant->>Web: Submits Statement ("The fan was broken")
-    Web->>API: POST /api/analyze (Move-In + Move-Out Photos)
-    API->>Gemini: Compare photos (Vision analysis)
-    Gemini-->>API: JSON: { damageFound: true, repairCost: 150 }
-    Note right of Web: Refund = Deposit - RepairCost
-    Web->>API: POST /api/record-inspection
-    API->>Monad: recordInspection(bookingId, reportHash, repairCost, damageFound)
-    Monad-->>API: Transaction Hash
-    API-->>Web: Final Verdict & Refund Displayed
+    Tenant->>App: Starts Move-Out & Uploads Current Photos
+    Tenant->>App: Submits Statement ("The fan was broken")
+    App->>Gemini: Compare photos (Client-side Vision analysis)
+    Gemini-->>App: JSON: { damageFound: true, repairCost: 150 }
+    Note right of App: Refund = Deposit - RepairCost
+    App->>Monad: recordInspection(bookingId, reportHash, repairCost, damageFound) [Signed by User Wallet]
+    Monad-->>App: Transaction Hash
+    App-->>Tenant: Final Verdict & Refund Displayed
 ```
 
 ---
@@ -58,8 +55,8 @@ sequenceDiagram
 
 *   **Blockchain**: **Monad Testnet** (for high throughput, sub-second finality, and low transaction costs).
 *   **Smart Contracts**: **Solidity** compiled and deployed using **Remix IDE**.
-*   **Vision AI**: **Gemini 1.5/2.5 Flash** (performing property condition comparisons with rigid JSON schema outputs).
-*   **Frontend**: **React 19**, and **Tailwind CSS v4** (styled using custom Pop-art / Neo-Brutalist themes).
+*   **Vision AI**: **Gemini 2.5 Flash** (performing property condition comparisons client-side with rigid JSON schema outputs).
+*   **Frontend / Interface**: **React 19**, **Vite**, and **Tailwind CSS v4** (styled using custom Pop-art / Neo-Brutalist themes).
 *   **Image Compression**: Client-side **HTML5 Canvas Compression** (resizes and optimizes photos to base64, keeping localStorage under limits).
 
 ---
@@ -82,38 +79,24 @@ function recordInspection(string calldata bookingId, bytes32 reportHash, uint256
 Ensure you have Node.js (v18+) and npm installed.
 
 ### 2. Configure Environment Variables
-Create a `.env.local` file inside the `backend/` directory:
+Create a `.env` file inside the `app/` directory:
 ```env
-# Monad Configuration
-MONAD_PRIVATE_KEY=your_private_key
-REGISTRY_CONTRACT_ADDRESS=0xd9145CCE52D386f254917e481eB44e9943F39138
-
-# Gemini API Key
-GEMINI_API_KEY=your_gemini_key
+VITE_GEMINI_API_KEY=your_gemini_api_key
+VITE_REGISTRY_CONTRACT_ADDRESS=0xd9145CCE52D386f254917e481eB44e9943F39138
 ```
 
 ### 3. Installation
-Install backend and frontend dependencies:
+Install app dependencies:
 ```bash
-# In backend/
-cd backend
-npm install
-
-# In frontend/
-cd frontend
+# Go to app/
+cd app
 npm install
 ```
 
 ### 4. Running Locally
-Start the Express server and Vite development server:
+Start the Vite development server:
 ```bash
-# In backend/
-npm run dev
-
-# In frontend/
+# In app/
 npm run dev
 ```
-
----
-
-
+Open `http://localhost:5173` in your browser. Ensure your Web3 wallet is connected to **Monad Testnet** (Chain ID: `10143`).

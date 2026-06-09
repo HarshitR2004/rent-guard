@@ -1,8 +1,50 @@
 import { useNavigate } from "react-router-dom";
 import { PROPERTIES } from "../data/properties";
+import { useWallet } from "../context/WalletContext";
 
 export default function PropertiesPage() {
   const navigate = useNavigate();
+  const { isConnected, isConnecting, connectWallet, error } = useWallet();
+
+  if (!isConnected) {
+    return (
+      <div className="max-w-md mx-auto mt-12 animate-fade-in-up">
+        <div className="neo-container bg-[#151513] border border-[#f4f3ef]/10 text-white text-center py-12 flex flex-col items-center gap-6">
+          {/* Cyber Lock Icon */}
+          <div className="w-16 h-16 rounded-full bg-neo-bg-yellow/5 border border-neo-bg-yellow/30 flex items-center justify-center text-2xl text-neo-bg-yellow animate-pulse">
+            🔒
+          </div>
+
+          <div>
+            <h2 className="font-heading font-light text-2xl text-[#f4f3ef] tracking-wide uppercase mb-2">
+              Access Restricted
+            </h2>
+            <span className="font-pixel text-[8px] text-neo-bg-yellow tracking-[0.2em] uppercase font-bold">
+              [ WALLET AUTHENTICATION REQUIRED ]
+            </span>
+          </div>
+
+          <p className="font-body text-xs text-[#9c998f] leading-relaxed px-4">
+            To view the active property registry, audit escrow contract status, or record moves on Monad Testnet, you must authorize your Web3 wallet.
+          </p>
+
+          {error && (
+            <div className="bg-[#cc5a37]/5 border border-[#cc5a37]/35 text-[#cc5a37] text-[10px] font-pixel p-3.5 w-full rounded-none">
+              ⚠️ {error}
+            </div>
+          )}
+
+          <button
+            onClick={connectWallet}
+            disabled={isConnecting}
+            className="neo-btn w-full mt-4 text-xs font-bold tracking-[0.2em]"
+          >
+            {isConnecting ? "AUTHORIZING WALLET..." : "CONNECT WEB3 WALLET"}
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-10">

@@ -1,7 +1,14 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { ethers } from "ethers";
 import { PROPERTIES } from "../data/properties";
 import { ImageUploader } from "../components/ImageUploader";
+import { useWallet } from "../context/WalletContext";
+
+const CONTRACT_ADDRESS = import.meta.env.VITE_REGISTRY_CONTRACT_ADDRESS;
+const INSPECTION_REGISTRY_ABI = [
+  "function recordInspection(string calldata bookingId, bytes32 reportHash, uint256 repairCost, bool damageFound) external",
+];
 
 // Helper to generate deterministic SHA-256 hash in browser
 async function sha256(message) {
@@ -12,10 +19,23 @@ async function sha256(message) {
   return "0x" + hashHex;
 }
 
+// Helper to extract raw base64 data and mimeType from data URIs
+function extractBase64Data(img) {
+  const url = img?.url || img;
+  if (typeof url === "string" && url.startsWith("data:")) {
+    const matches = url.match(/^data:([a-zA-Z0-9]+\/[a-zA-Z0-9-\.+]+);base64,(.+)$/);
+    if (matches && matches.length === 3) {
+      return { mimeType: matches[1], data: matches[2] };
+    }
+  }
+  return null;
+}
+
 export default function MoveOutPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const property = PROPERTIES.find(p => p.id === parseInt(id));
+  const { isConnected, signer, connectWallet } = useWallet();
 
   const [moveInState, setMoveInState] = useState(null);
   const [images, setImages] = useState([]);
@@ -33,6 +53,11 @@ export default function MoveOutPage() {
   }, [id]);
 
   const handleVerify = async () => {
+    if (!isConnected) {
+      await connectWallet();
+      return;
+    }
+
     setIsVerifying(true);
     setErrorMessage("");
     try {
@@ -44,20 +69,80 @@ export default function MoveOutPage() {
       const deposit = moveInState.deposit || property.deposit;
       const moveInImages = moveInState.moveInImages || [];
 
-      // 1. Compare evidence with Gemini Vision
+      // 1. Compare evidence with Gemini Vision (client-side)
       setVerifyingStep("GEMINI VISION ANALYZING PHOTOS...");
-      const analyzeRes = await fetch("/api/analyze", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          moveInImages: moveInImages,
-          moveOutImages: images
-        })
-      });
-      const analyzeData = await analyzeRes.json();
-      if (!analyzeRes.ok) throw new Error(analyzeData.error || "AI comparison failed");
 
-      const { damageFound, damageDescription, estimatedRepairCost } = analyzeData;
+      const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+      if (!apiKey) {
+        throw new Error("VITE_GEMINI_API_KEY is not configured in environment variables.");
+      }
+
+      const validMoveInParts = moveInImages.map(extractBase64Data).filter(Boolean);
+      const validMoveOutParts = images.map(extractBase64Data).filter(Boolean);
+
+      if (validMoveInParts.length === 0 && validMoveOutParts.length === 0) {
+        throw new Error("Could not extract base64 data from move-in or check-out images.");
+      }
+
+      const parts = [
+        {
+          text: `You are a rental property inspector.
+Compare the move-in evidence (first set of photos) and the move-out evidence (second set of photos).
+Identify if there are any new damages, broken fixtures, or missing items in the move-out evidence that were not present in the move-in evidence.
+Ignore lighting changes, camera angle changes, image quality changes, and normal wear and tear.
+
+Return structured JSON specifying:
+- damageFound (boolean)
+- damageDescription (string describing the damage or "No new damage found")
+- estimatedRepairCost (integer representing cost in local currency units, e.g. 150, or 0 if none)
+
+Respond ONLY with the JSON object.`
+        }
+      ];
+
+      parts.push({ text: "--- MOVE-IN EVIDENCE ---" });
+      validMoveInParts.forEach((p) => {
+        parts.push({ inlineData: { mimeType: p.mimeType, data: p.data } });
+      });
+
+      parts.push({ text: "--- MOVE-OUT EVIDENCE ---" });
+      validMoveOutParts.forEach((p) => {
+        parts.push({ inlineData: { mimeType: p.mimeType, data: p.data } });
+      });
+
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ parts }],
+            generationConfig: {
+              responseMimeType: "application/json",
+              responseSchema: {
+                type: "OBJECT",
+                properties: {
+                  damageFound: { type: "BOOLEAN" },
+                  damageDescription: { type: "STRING" },
+                  estimatedRepairCost: { type: "INTEGER" },
+                },
+                required: ["damageFound", "damageDescription", "estimatedRepairCost"],
+              },
+            },
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Gemini API error: ${response.status} - ${errorText}`);
+      }
+
+      const data = await response.json();
+      const resultText = data.candidates[0].content.parts[0].text;
+      const result = JSON.parse(resultText.trim());
+
+      const { damageFound, damageDescription, estimatedRepairCost } = result;
 
       // 2. Calculate refund
       const refundAmount = Math.max(0, deposit - estimatedRepairCost);
@@ -76,27 +161,25 @@ export default function MoveOutPage() {
       setVerifyingStep("GENERATING REPORT HASH...");
       const reportHash = await sha256(JSON.stringify(report));
 
-      // 5. Save inspection result to Monad
-      setVerifyingStep("RECORDING ON MONAD TESTNET...");
-      const recordRes = await fetch("/api/record-inspection", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          bookingId,
-          reportHash,
-          repairCost: estimatedRepairCost,
-          damageFound
-        })
-      });
-      const recordData = await recordRes.json();
-      if (!recordRes.ok) throw new Error(recordData.error || "Recording inspection on Monad failed");
+      // 5. Save inspection result to Monad via client-side transaction
+      setVerifyingStep("WAITING FOR WALLET SIGNATURE...");
+      if (!signer) {
+        throw new Error("Wallet is connected, but no signer is available. Please reconnect.");
+      }
+
+      const contract = new ethers.Contract(CONTRACT_ADDRESS, INSPECTION_REGISTRY_ABI, signer);
+      const tx = await contract.recordInspection(bookingId, reportHash, estimatedRepairCost, damageFound);
+
+      setVerifyingStep("WAITING FOR TRANSACTION CONFIRMATION...");
+      const receipt = await tx.wait();
+      const txHash = receipt.hash || receipt.transactionHash || tx.hash;
 
       // 7. Persist final report
       const finalReport = {
         ...report,
         reportHash,
         moveInTxHash: moveInState.moveInTxHash,
-        moveOutTxHash: recordData.transactionHash,
+        moveOutTxHash: txHash,
         moveInImages,
         moveOutImages: images,
         timestamp: new Date().toISOString()
@@ -110,13 +193,17 @@ export default function MoveOutPage() {
         damageCost: estimatedRepairCost,
         refund: refundAmount,
         reportHash,
-        txHash: recordData.transactionHash
+        txHash: txHash
       });
 
       setIsVerifying(false);
     } catch (error) {
-      console.error(error);
-      setErrorMessage(error.message || "An error occurred during verification.");
+      console.error("Move-out processing failed:", error);
+      let displayError = error.message || "An error occurred during verification.";
+      if (error.code === "ACTION_REJECTED") {
+        displayError = "User rejected the transaction signature in their wallet.";
+      }
+      setErrorMessage(displayError);
       setIsVerifying(false);
     }
   };
@@ -168,11 +255,14 @@ export default function MoveOutPage() {
             id="verify-settle-btn"
             onClick={handleVerify}
             disabled={images.length === 0 || isVerifying}
-            className={`neo-btn w-full py-4.5 text-xs font-bold tracking-[0.2em] animate-fade-in-up [animation-delay:300ms] ${
-              isVerifying ? '!bg-neo-bg-purple !border-neo-bg-purple !text-white' : ''
-            }`}
+            className={`neo-btn w-full py-4.5 text-xs font-bold tracking-[0.2em] animate-fade-in-up [animation-delay:300ms] ${isVerifying ? '!bg-neo-bg-purple !border-neo-bg-purple !text-white' : ''
+              }`}
           >
-            {isVerifying ? verifyingStep : 'VERIFY EVIDENCE & INITIALIZE SETTLEMENT'}
+            {!isConnected
+              ? 'CONNECT WALLET TO SETTLE'
+              : isVerifying
+                ? verifyingStep
+                : 'VERIFY EVIDENCE & INITIALIZE SETTLEMENT'}
           </button>
         </>
       ) : (
@@ -182,11 +272,10 @@ export default function MoveOutPage() {
           <div className="absolute top-0 right-0 w-16 h-16 border-b border-l border-[#f4f3ef]/5 pointer-events-none"></div>
 
           {/* Verdict Banner */}
-          <div className={`p-5 text-center border rounded-none ${
-            settlement.damageCost > 0 
-              ? 'bg-[#cc5a37]/5 border-[#cc5a37]/35 text-[#cc5a37]' 
+          <div className={`p-5 text-center border rounded-none ${settlement.damageCost > 0
+              ? 'bg-[#cc5a37]/5 border-[#cc5a37]/35 text-[#cc5a37]'
               : 'bg-[#3e9c70]/5 border-[#3e9c70]/35 text-[#3e9c70]'
-          }`}>
+            }`}>
             <h3 className="font-pixel text-[10px] tracking-[0.2em] uppercase font-bold">
               {settlement.damageCost > 0 ? '● DAMAGE ASSESSED BY GEMINI' : '○ MOVE-OUT APPROVED // NO DAMAGES'}
             </h3>
@@ -195,7 +284,7 @@ export default function MoveOutPage() {
           {/* Audit invoice report */}
           <div className="neo-inner-card bg-black/20 border border-[#f4f3ef]/5 p-6 rounded-none font-body">
             <h4 className="font-pixel text-[9px] text-white/50 mb-4 tracking-[0.2em] uppercase font-bold">// AI VISION PARSE LOG</h4>
-            
+
             <div className="flex justify-between items-baseline border-b border-[#f4f3ef]/10 pb-4 mb-4 gap-4">
               <span className="font-heading italic text-lg text-[#f4f3ef] leading-tight">
                 {settlement.damageDesc || "No new structural/cosmetic damage detected in check-out photos."}
@@ -204,7 +293,7 @@ export default function MoveOutPage() {
                 -${settlement.damageCost}
               </span>
             </div>
-            
+
             <div className="flex justify-between items-center text-[10px] text-[#9c998f] font-pixel">
               <span>INITIAL SECURITY ESCROW</span>
               <span>${property.deposit}</span>
@@ -217,7 +306,7 @@ export default function MoveOutPage() {
             <div className="absolute top-2 right-2 w-1.5 h-1.5 bg-neo-accent-green/40"></div>
             <div className="absolute bottom-2 left-2 w-1.5 h-1.5 bg-neo-accent-green/40"></div>
             <div className="absolute bottom-2 right-2 w-1.5 h-1.5 bg-neo-accent-green/40"></div>
-            
+
             <p className="font-pixel text-[9px] text-[#9c998f] tracking-[0.2em] mb-2 uppercase font-bold">
               AMOUNT REFUNDED TO TENANT
             </p>

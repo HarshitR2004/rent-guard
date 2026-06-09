@@ -1,7 +1,18 @@
 import { useNavigate } from "react-router-dom";
+import { useWallet } from "../context/WalletContext";
 
 export default function HomePage() {
   const navigate = useNavigate();
+  const { isConnected, connectWallet } = useWallet();
+
+  const handleEnterRegistry = async () => {
+    if (isConnected) {
+      navigate("/properties");
+    } else {
+      await connectWallet();
+      navigate("/properties");
+    }
+  };
 
   return (
     <div className="flex flex-col gap-20 pb-20 mt-8">
@@ -29,10 +40,10 @@ export default function HomePage() {
         <div className="animate-fade-in-up [animation-delay:300ms]">
           <button
             id="view-properties-btn"
-            onClick={() => navigate("/properties")}
+            onClick={handleEnterRegistry}
             className="neo-btn text-xs px-10 py-4.5"
           >
-            ENTER THE REGISTRY
+            {isConnected ? "ENTER THE REGISTRY" : "CONNECT WALLET TO ENTER"}
           </button>
         </div>
       </section>
