@@ -1,0 +1,207 @@
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400;1,500&family=JetBrains+Mono:wght@400;500;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  /* Architectural Modernist Palette */
+  --color-neo-bg-blue: #7d9bb0;        /* Steel Slate Blue */
+  --color-neo-bg-red: #cc5a37;         /* Terracotta Red */
+  --color-neo-bg-yellow: #e5a93b;      /* Sophisticated Saffron Gold */
+  --color-neo-bg-purple: #8e806a;      /* Warm Bronze Taupe */
+  
+  --color-neo-card-white: #151513;     /* Deep Bronze Ash Surface */
+  --color-neo-card-black: #f4f3ef;     /* Pure Silk Cream Text */
+  
+  --color-neo-accent-green: #3e9c70;   /* Muted Forest Sage */
+  --color-neo-accent-pink: #b35a38;    /* Burnt Terracotta */
+  --color-neo-accent-blue: #5d7a68;    /* Olive Sage Accent */
+
+  /* Typography Mapping */
+  --font-pixel: "JetBrains Mono", monospace;
+  --font-body: "Plus Jakarta Sans", sans-serif;
+  --font-heading: "Cormorant Garamond", serif;
+}
+
+body {
+  background-color: #0c0c0a; /* Warm Dark Ash */
+  color: #dcdad2; /* Warm Silk Grey */
+  font-family: var(--font-body);
+  margin: 0;
+  min-height: 100vh;
+  position: relative;
+  overflow-x: hidden;
+  
+  /* Drafting guidelines + warm volumetric ambient light casts */
+  background-image: 
+    linear-gradient(rgba(220, 218, 210, 0.012) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(220, 218, 210, 0.012) 1px, transparent 1px),
+    radial-gradient(circle at 80% 20%, rgba(229, 169, 59, 0.08) 0%, rgba(204, 90, 55, 0.03) 40%, transparent 70%),
+    radial-gradient(circle at 10% 60%, rgba(62, 156, 112, 0.05) 0%, transparent 45%),
+    radial-gradient(circle at 50% -20%, rgba(220, 218, 210, 0.06) 0%, transparent 60%);
+  background-size: 48px 48px, 48px 48px, 100% 100%, 100% 100%, 100% 100%;
+}
+
+/* Animations for staggered reveals and premium states */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes lineDraw {
+  from {
+    width: 0;
+  }
+  to {
+    width: 100%;
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-line-draw {
+  animation: lineDraw 1s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Utility definitions */
+@utility neo-border {
+  border: 1px solid rgba(220, 218, 210, 0.07);
+}
+
+@utility neo-shadow {
+  box-shadow: 0 16px 40px -10px rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+@utility neo-shadow-hover {
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  &:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 24px 48px -12px rgba(229, 169, 59, 0.08);
+    border-color: rgba(229, 169, 59, 0.3);
+  }
+  &:active {
+    transform: translateY(-1px);
+    box-shadow: 0 12px 24px -8px rgba(229, 169, 59, 0.04);
+  }
+}
+
+@utility neo-container {
+  @apply bg-[#151513]/90 neo-border neo-shadow p-8 rounded-lg relative overflow-hidden;
+  background-image: linear-gradient(180deg, rgba(220, 218, 210, 0.015) 0%, transparent 100%);
+  
+  /* Custom thin corner indicators representing blueprints */
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 6px;
+    height: 6px;
+    border-top: 1px solid rgba(229, 169, 59, 0.4);
+    border-left: 1px solid rgba(229, 169, 59, 0.4);
+  }
+  &::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    width: 6px;
+    height: 6px;
+    border-bottom: 1px solid rgba(229, 169, 59, 0.4);
+    border-right: 1px solid rgba(229, 169, 59, 0.4);
+  }
+}
+
+@utility neo-inner-card {
+  @apply bg-black/30 neo-border p-5 rounded-md;
+  border-color: rgba(220, 218, 210, 0.05);
+}
+
+@utility neo-btn {
+  @apply px-8 py-3.5 rounded-none cursor-pointer inline-flex justify-center items-center gap-2.5 transition-all duration-300 font-bold tracking-widest uppercase;
+  font-family: var(--font-pixel);
+  font-size: 0.75rem;
+  background: var(--color-neo-bg-yellow);
+  color: #0c0c0a;
+  border: 1px solid var(--color-neo-bg-yellow);
+  box-shadow: 0 6px 16px rgba(229, 169, 59, 0.15);
+  position: relative;
+  z-index: 1;
+  overflow: hidden;
+  
+  /* Sliding hover background effect */
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: #f4f3ef;
+    z-index: -1;
+    transform: scaleX(0);
+    transform-origin: right;
+    transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  
+  &:hover:not(:disabled) {
+    color: #0c0c0a;
+    box-shadow: 0 12px 24px rgba(229, 169, 59, 0.25);
+    border-color: #f4f3ef;
+    &::before {
+      transform: scaleX(1);
+      transform-origin: left;
+    }
+  }
+  
+  &:active:not(:disabled) {
+    transform: translateY(1px);
+    box-shadow: 0 4px 8px rgba(229, 169, 59, 0.1);
+  }
+  
+  &:disabled {
+    background: #1c1c1a;
+    color: #555550;
+    border-color: rgba(220, 218, 210, 0.05);
+    box-shadow: none;
+    cursor: not-allowed;
+  }
+}
+
+@utility neo-badge {
+  @apply px-4 py-1.5 font-bold uppercase inline-block rounded-none bg-black/45 text-neo-bg-yellow border;
+  font-family: var(--font-pixel);
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  border-color: rgba(229, 169, 59, 0.3);
+}
+
+.text-gradient-saffron {
+  background: linear-gradient(135deg, #f4f3ef 40%, var(--color-neo-bg-yellow) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
