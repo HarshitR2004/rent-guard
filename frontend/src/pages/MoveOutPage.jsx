@@ -121,46 +121,6 @@ export default function MoveOutPage() {
     }
   };
 
-  const handleBypass = async () => {
-    // Save mock final report and complete flow
-    const bookingId = moveInState?.bookingId || `BOOK-${id}-MOCK`;
-    const deposit = moveInState?.deposit || property.deposit;
-    const damageCost = 150;
-    const refundAmount = deposit - damageCost;
-
-    const report = {
-      bookingId,
-      damageFound: true,
-      damageDescription: "Broken ceiling fan",
-      estimatedRepairCost: damageCost,
-      refundAmount,
-      tenantStatement: statement
-    };
-
-    const reportHash = await sha256(JSON.stringify(report));
-    const mockTxHash = "0x" + Array(64).fill(0).map(() => Math.floor(Math.random()*16).toString(16)).join("");
-
-    const finalReport = {
-      ...report,
-      reportHash,
-      moveInTxHash: moveInState?.moveInTxHash || "0x0000000000000000000000000000000000000000000000000000000000000000",
-      moveOutTxHash: mockTxHash,
-      moveInImages: moveInState?.moveInImages || [],
-      moveOutImages: images,
-      timestamp: new Date().toISOString()
-    };
-
-    localStorage.setItem(`property_${id}_final_report`, JSON.stringify(finalReport));
-    localStorage.removeItem(`property_${id}_state`);
-
-    setSettlement({
-      damageDesc: "Broken ceiling fan",
-      damageCost: damageCost,
-      refund: refundAmount,
-      reportHash,
-      txHash: mockTxHash
-    });
-  };
 
   return (
     <div className="max-w-2xl mx-auto flex flex-col gap-10 mt-6">
@@ -200,13 +160,7 @@ export default function MoveOutPage() {
 
           {errorMessage && (
             <div className="bg-[#cc5a37]/5 border border-[#cc5a37]/35 text-[#f4f3ef]/80 p-5 rounded-none font-body text-xs animate-fade-in-up">
-              <p className="mb-3 font-semibold text-[#cc5a37]">⚠️ {errorMessage}</p>
-              <button
-                onClick={handleBypass}
-                className="text-[9px] text-neo-bg-yellow hover:text-white transition-colors uppercase font-pixel cursor-pointer tracking-wider font-bold"
-              >
-                [ Bypass analysis & register for testing ]
-              </button>
+              <p className="font-semibold text-[#cc5a37]">⚠️ {errorMessage}</p>
             </div>
           )}
 

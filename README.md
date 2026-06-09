@@ -116,5 +116,4 @@ npm run dev
 
 ---
 
-## 🛡️ Developer Safeguards
-If you are running the project locally without API keys or Testnet balances, we've built-in a **Developer Bypass tool** directly on the Move-In and Move-Out screens. Clicking the bypass buttons will instantly simulate on-chain transaction logs and AI responses, allowing you to test the entire application interface and UX transitions effortlessly.
+

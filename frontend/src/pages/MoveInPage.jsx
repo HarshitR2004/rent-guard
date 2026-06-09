@@ -60,18 +60,7 @@ export default function MoveInPage() {
     }
   };
 
-  const handleBypass = () => {
-    // Save state with mock tx hash to allow frontend testing when keys/contracts are not ready
-    localStorage.setItem(`property_${id}_state`, JSON.stringify({
-      status: 'Occupied',
-      deposit: Number(depositAmount),
-      bookingId,
-      moveInImages: images,
-      moveInTxHash: "0x" + Array(64).fill(0).map(() => Math.floor(Math.random()*16).toString(16)).join(""),
-      timestamp: new Date().toISOString()
-    }));
-    navigate(`/property/${id}`);
-  };
+
 
   return (
     <div className="max-w-2xl mx-auto flex flex-col gap-10 mt-6">
@@ -124,13 +113,7 @@ export default function MoveInPage() {
 
         {errorMessage && (
           <div className="bg-[#cc5a37]/5 border border-[#cc5a37]/35 text-[#f4f3ef]/80 p-5 rounded-none mb-8 font-body text-xs relative">
-            <p className="mb-3 font-semibold flex items-center gap-2 text-[#cc5a37]">⚠️ {errorMessage}</p>
-            <button
-              onClick={handleBypass}
-              className="text-[9px] text-neo-bg-yellow hover:text-white transition-colors uppercase font-pixel cursor-pointer tracking-wider font-bold"
-            >
-              [ Bypass on-chain register for testing ]
-            </button>
+            <p className="font-semibold flex items-center gap-2 text-[#cc5a37]">⚠️ {errorMessage}</p>
           </div>
         )}
 
