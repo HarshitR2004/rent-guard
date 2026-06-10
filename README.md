@@ -22,7 +22,7 @@ RentGuard democratizes and automates the escrow and condition verification proce
 
 ## ✨ Key Features
 *   **Wallet Authentication**: Simple Web3 onboarding using MetaMask/Rabby connected to the Monad Testnet.
-*   **AI Damage Assessment**: Leverages Gemini Vision AI (`gemini-2.5-flash`) via secure serverless endpoints to detect new damages and estimate repair costs.
+*   **AI Damage Assessment**: Leverages Gemini Vision AI via secure serverless endpoints to detect new damages and estimate repair costs.
 *   **IPFS Evidence Storage**: Room photos are pinned to IPFS (via Pinata) at check-in and check-out, returning cryptographic CIDs.
 *   **On-Chain Inspection Registry**: Deposit details, inspection reports, and evidence CIDs are immutably registered on-chain in the Solidity contract.
 *   **Automated Refund Calculation**: Automatically computes tenant refunds based on pre-registered deposits minus AI-estimated damages (`Deposit - RepairCost`).
@@ -69,8 +69,8 @@ sequenceDiagram
 ---
 
 ## ⚙️ System Architecture
-*   **Frontend**: Single Page React 19 app bootstrapped with Vite, styled with Tailwind CSS v4. Managed entirely in `/app/src`.
-*   **AI Layer**: Gemini 2.5 Flash model queried through a Vercel serverless function (`/api/gemini`) to protect API keys.
+*   **Frontend**: Single Page React app bootstrapped with Vite, styled with Tailwind CSS. Managed entirely in `/app/src`.
+*   **AI Layer**: Gemini Flash model queried through a Vercel serverless function (`/api/gemini`) to protect API keys.
 *   **Decentralized Storage**: Pinata handles IPFS uploads. Securely queried server-side through `/api/pinata` to hide JWT secrets.
 *   **Smart Contract Layer**: Solidity contract `EscrowInspectionRegistryV2` deployed on Monad Testnet to store immutable mapping records.
 
@@ -177,9 +177,9 @@ $$\text{Refund Amount} = \max(0, \text{Deposit Amount} - \text{Estimated Repair 
 ---
 
 ## 🛠️ Tech Stack
-*   **Frontend**: React 19, Vite, Tailwind CSS v4, Ethers.js
+*   **Frontend**: React, Vite, Tailwind CSS, Ethers.js
 *   **Blockchain**: Monad Testnet (RPC: `https://testnet-rpc.monad.xyz`)
-*   **AI**: Gemini 2.5 Flash
+*   **AI**: Gemini Flash
 *   **Storage**: IPFS (via Pinata)
 *   **Wallet**: MetaMask / Rabby / EIP-1193 wallets
 *   **Deployment**: Vercel
