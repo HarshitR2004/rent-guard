@@ -6,7 +6,6 @@
 
 ## 🔗 Links
 *   **Live Demo**: [https://rent-guard-beta.vercel.app/](https://rent-guard-beta.vercel.app/)
-*   **Demo Video**: [Loom/Youtube Demo Video](https://youtube.com) *(Placeholder)*
 *   **Smart Contract Address**: [`0xd9145CCE52D386f254917e481eB44e9943F39138`](https://testnet.monadscan.com/address/0xd9145CCE52D386f254917e481eB44e9943F39138)
 *   **Monad Explorer Link**: [Monadscan Address Registry](https://testnet.monadscan.com/address/0xd9145CCE52D386f254917e481eB44e9943F39138)
 
