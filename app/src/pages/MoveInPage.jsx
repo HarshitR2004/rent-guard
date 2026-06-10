@@ -4,10 +4,11 @@ import { ethers } from "ethers";
 import { PROPERTIES } from "../data/properties";
 import { ImageUploader } from "../components/ImageUploader";
 import { useWallet } from "../context/WalletContext";
+import { uploadImagesToPinata } from "../utils/pinata";
 
-const CONTRACT_ADDRESS = import.meta.env.VITE_REGISTRY_CONTRACT_ADDRESS || "0xd9145CCE52D386f254917e481eB44e9943F39138";
+const CONTRACT_ADDRESS = import.meta.env.VITE_REGISTRY_CONTRACT_ADDRESS || "0x0000000000000000000000000000000000000000";
 const DEPOSIT_REGISTRY_ABI = [
-  "function registerDeposit(string calldata bookingId, uint256 depositAmount) external",
+  "function registerDeposit(string calldata bookingId, uint256 depositAmount, string calldata moveInCID) external",
 ];
 
 export default function MoveInPage() {
@@ -38,18 +39,20 @@ export default function MoveInPage() {
 
     setIsLocking(true);
     setErrorMessage("");
-    setLockingStep("WAITING FOR WALLET SIGNATURE...");
     
     try {
       if (!signer) {
         throw new Error("Wallet connected, but no signer available. Please reconnect.");
       }
 
-      // Initialize Ethers Contract with Signer
-      const contract = new ethers.Contract(CONTRACT_ADDRESS, DEPOSIT_REGISTRY_ABI, signer);
+      // 1. Upload move-in evidence to Pinata
+      setLockingStep("SECURING EVIDENCE...");
+      const moveInCID = await uploadImagesToPinata(images, "move-in-evidence");
 
-      // Call smart contract function directly
-      const tx = await contract.registerDeposit(bookingId, Number(depositAmount));
+      // 2. Call smart contract with V2 signature
+      setLockingStep("WAITING FOR WALLET SIGNATURE...");
+      const contract = new ethers.Contract(CONTRACT_ADDRESS, DEPOSIT_REGISTRY_ABI, signer);
+      const tx = await contract.registerDeposit(bookingId, Number(depositAmount), moveInCID);
       
       setLockingStep("WAITING FOR TRANSACTION CONFIRMATION...");
       const receipt = await tx.wait();
@@ -62,6 +65,7 @@ export default function MoveInPage() {
         deposit: Number(depositAmount),
         bookingId,
         moveInImages: images,
+        moveInCID,
         moveInTxHash: txHash,
         timestamp: new Date().toISOString()
       }));

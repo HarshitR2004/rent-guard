@@ -4,10 +4,11 @@ import { ethers } from "ethers";
 import { PROPERTIES } from "../data/properties";
 import { ImageUploader } from "../components/ImageUploader";
 import { useWallet } from "../context/WalletContext";
+import { uploadImagesToPinata, uploadReportToPinata } from "../utils/pinata";
 
 const CONTRACT_ADDRESS = import.meta.env.VITE_REGISTRY_CONTRACT_ADDRESS;
 const INSPECTION_REGISTRY_ABI = [
-  "function recordInspection(string calldata bookingId, bytes32 reportHash, uint256 repairCost, bool damageFound) external",
+  "function recordInspection(string calldata bookingId, bytes32 reportHash, string calldata reportCID, string calldata moveOutCID, uint256 repairCost, bool damageFound) external",
 ];
 
 // Helper to generate deterministic SHA-256 hash in browser
@@ -72,11 +73,6 @@ export default function MoveOutPage() {
       // 1. Compare evidence with Gemini Vision (client-side)
       setVerifyingStep("GEMINI VISION ANALYZING PHOTOS...");
 
-      const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-      if (!apiKey) {
-        throw new Error("VITE_GEMINI_API_KEY is not configured in environment variables.");
-      }
-
       const validMoveInParts = moveInImages.map(extractBase64Data).filter(Boolean);
       const validMoveOutParts = images.map(extractBase64Data).filter(Boolean);
 
@@ -110,32 +106,15 @@ Respond ONLY with the JSON object.`
         parts.push({ inlineData: { mimeType: p.mimeType, data: p.data } });
       });
 
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{ parts }],
-            generationConfig: {
-              responseMimeType: "application/json",
-              responseSchema: {
-                type: "OBJECT",
-                properties: {
-                  damageFound: { type: "BOOLEAN" },
-                  damageDescription: { type: "STRING" },
-                  estimatedRepairCost: { type: "INTEGER" },
-                },
-                required: ["damageFound", "damageDescription", "estimatedRepairCost"],
-              },
-            },
-          }),
-        }
-      );
+      const response = await fetch("/api/gemini", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ parts }),
+      });
 
       if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Gemini API error: ${response.status} - ${errorText}`);
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Gemini analysis failed (${response.status})`);
       }
 
       const data = await response.json();
@@ -161,23 +140,34 @@ Respond ONLY with the JSON object.`
       setVerifyingStep("GENERATING REPORT HASH...");
       const reportHash = await sha256(JSON.stringify(report));
 
-      // 5. Save inspection result to Monad via client-side transaction
+      // 5. Upload checkout evidence to Pinata
+      setVerifyingStep("ARCHIVING EVIDENCE...");
+      const moveOutCID = await uploadImagesToPinata(images, "move-out-evidence");
+
+      // 6. Upload AI report to Pinata
+      setVerifyingStep("ARCHIVING REPORT...");
+      const reportCID = await uploadReportToPinata(report);
+
+      // 7. Save inspection result to Monad via client-side transaction
       setVerifyingStep("WAITING FOR WALLET SIGNATURE...");
       if (!signer) {
         throw new Error("Wallet is connected, but no signer is available. Please reconnect.");
       }
 
       const contract = new ethers.Contract(CONTRACT_ADDRESS, INSPECTION_REGISTRY_ABI, signer);
-      const tx = await contract.recordInspection(bookingId, reportHash, estimatedRepairCost, damageFound);
+      const tx = await contract.recordInspection(bookingId, reportHash, reportCID, moveOutCID, estimatedRepairCost, damageFound);
 
       setVerifyingStep("WAITING FOR TRANSACTION CONFIRMATION...");
       const receipt = await tx.wait();
       const txHash = receipt.hash || receipt.transactionHash || tx.hash;
 
-      // 7. Persist final report
+      // 8. Persist final report
       const finalReport = {
         ...report,
         reportHash,
+        reportCID,
+        moveOutCID,
+        moveInCID: moveInState.moveInCID || "",
         moveInTxHash: moveInState.moveInTxHash,
         moveOutTxHash: txHash,
         moveInImages,
@@ -193,6 +183,8 @@ Respond ONLY with the JSON object.`
         damageCost: estimatedRepairCost,
         refund: refundAmount,
         reportHash,
+        reportCID,
+        moveOutCID,
         txHash: txHash
       });
 
@@ -328,10 +320,22 @@ Respond ONLY with the JSON object.`
                 {settlement.txHash}
               </a>
             </div>
-            <div className="flex flex-col sm:flex-row justify-between gap-2">
+            <div className="flex flex-col sm:flex-row justify-between border-b border-[#f4f3ef]/5 pb-3 gap-2">
               <span className="text-white/40 tracking-[0.15em] font-bold">INSPECTION AUDIT HASH</span>
               <span className="text-white/70 truncate max-w-[320px]">
                 {settlement.reportHash}
+              </span>
+            </div>
+            <div className="flex flex-col sm:flex-row justify-between border-b border-[#f4f3ef]/5 pb-3 gap-2">
+              <span className="text-white/40 tracking-[0.15em] font-bold">EVIDENCE ARCHIVE ID</span>
+              <span className="text-white/70 truncate max-w-[320px]">
+                {settlement.moveOutCID}
+              </span>
+            </div>
+            <div className="flex flex-col sm:flex-row justify-between gap-2">
+              <span className="text-white/40 tracking-[0.15em] font-bold">REPORT ARCHIVE ID</span>
+              <span className="text-white/70 truncate max-w-[320px]">
+                {settlement.reportCID}
               </span>
             </div>
           </div>
